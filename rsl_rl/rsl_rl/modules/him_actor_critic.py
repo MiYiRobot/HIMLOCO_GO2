@@ -86,31 +86,31 @@ class HIMActorCritic(nn.Module):
             print("ActorCritic.__init__ got unexpected arguments, which will be ignored: " + str([key for key in kwargs.keys()]))
         super(HIMActorCritic, self).__init__()
 
-        activation = get_activation(activation)
+        activation = get_activation(activation) #获取激活函数实例
 
-        self.history_size = int(num_actor_obs/num_one_step_obs)
+        self.history_size = int(num_actor_obs/num_one_step_obs)   #45*6/45=6
         self.num_actor_obs = num_actor_obs
         self.num_actions = num_actions
-        self.num_one_step_obs = num_one_step_obs
+        self.num_one_step_obs = num_one_step_obs   #45
 
         mlp_input_dim_a = num_one_step_obs + 3 + 16
-        mlp_input_dim_c = num_critic_obs
+        mlp_input_dim_c = num_critic_obs   #45 + 3 + 3 + 187
 
         # Estimator
         self.estimator = HIMEstimator(temporal_steps=self.history_size, num_one_step_obs=num_one_step_obs)
 
         # Policy
-        actor_layers = []
-        actor_layers.append(nn.Linear(mlp_input_dim_a, actor_hidden_dims[0]))
-        actor_layers.append(activation)
-        for l in range(len(actor_hidden_dims)):
-            if l == len(actor_hidden_dims) - 1:
+        actor_layers = []#append向列表添加元素
+        actor_layers.append(nn.Linear(mlp_input_dim_a, actor_hidden_dims[0]))   #线性层Linear（mlp_input_dim_a(45+3+16),512）
+        actor_layers.append(activation)   # 激活函数nn.ELU()
+        for l in range(len(actor_hidden_dims)):  #l = 0 1 2
+            if l == len(actor_hidden_dims) - 1:   #最后一个隐藏层  Linear(128,12)
                 actor_layers.append(nn.Linear(actor_hidden_dims[l], num_actions))
                 # actor_layers.append(nn.Tanh())
-            else:
+            else:   #连接前两层Linear(512,256)，Linear(256,128)，每层后面都接一个激活函数
                 actor_layers.append(nn.Linear(actor_hidden_dims[l], actor_hidden_dims[l + 1]))
                 actor_layers.append(activation)
-        self.actor = nn.Sequential(*actor_layers)
+        self.actor = nn.Sequential(*actor_layers)  #连接神经网络
 
         # Value function
         critic_layers = []
@@ -129,7 +129,7 @@ class HIMActorCritic(nn.Module):
         print(f'Estimator: {self.estimator.encoder}')
 
         # Action noise
-        self.std = nn.Parameter(init_noise_std * torch.ones(num_actions))
+        self.std = nn.Parameter(init_noise_std * torch.ones(num_actions))  #高斯策略的标准差
         self.distribution = None
         # disable args validation for speedup
         Normal.set_default_validate_args = False
@@ -164,7 +164,7 @@ class HIMActorCritic(nn.Module):
         return self.distribution.entropy().sum(dim=-1)
 
     def update_distribution(self, obs_history):
-        with torch.no_grad():
+        with torch.no_grad():  #关闭梯度计算
             vel, latent = self.estimator(obs_history) #神经网络从一堆历史数据中提炼和猜测速度和潜在变量
         actor_input = torch.cat((obs_history[:,:self.num_one_step_obs], vel, latent), dim=-1) #拼接成actor的输入
         mean = self.actor(actor_input) #actor网络前向传播，得到动作均值

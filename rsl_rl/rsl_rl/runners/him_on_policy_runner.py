@@ -68,10 +68,10 @@ class HIMOnPolicyRunner:
                                                         **self.policy_cfg).to(self.device)
         alg_class = eval(self.cfg["algorithm_class_name"]) # HIMPPO
         self.alg: HIMPPO = alg_class(actor_critic, device=self.device, **self.alg_cfg)
-        self.num_steps_per_env = self.cfg["num_steps_per_env"]
+        self.num_steps_per_env = self.cfg["num_steps_per_env"] #决定每次 iteration 收集多长的轨迹
         self.save_interval = self.cfg["save_interval"]
 
-        # init storage and model
+        # init storage and model   经验缓存区，在采样阶段把环境交互数据按时间步存起来，在更新阶段把数据按mini-batch取出来喂给网络做梯度更新
         self.alg.init_storage(self.env.num_envs, self.num_steps_per_env, [self.env.num_obs], [self.env.num_privileged_obs], [self.env.num_actions])
 
         # Log
@@ -89,7 +89,7 @@ class HIMOnPolicyRunner:
             self.writer = SummaryWriter(log_dir=self.log_dir, flush_secs=10)
         if init_at_random_ep_len:
             self.env.episode_length_buf = torch.randint_like(self.env.episode_length_buf, high=int(self.env.max_episode_length))
-        obs = self.env.get_observations()   #返回obs_buf
+        obs = self.env.get_observations()   #返回obs_buf(在base_task那里)
         privileged_obs = self.env.get_privileged_observations()  #返回privileged_obs_buf
         critic_obs = privileged_obs if privileged_obs is not None else obs
         obs, critic_obs = obs.to(self.device), critic_obs.to(self.device)
@@ -101,11 +101,11 @@ class HIMOnPolicyRunner:
         cur_reward_sum = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
         cur_episode_length = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
 
-        tot_iter = self.current_learning_iteration + num_learning_iterations
+        tot_iter = self.current_learning_iteration + num_learning_iterations  #总迭代次数
         for it in range(self.current_learning_iteration, tot_iter):
             start = time.time()
             # Rollout
-            with torch.inference_mode():
+            with torch.inference_mode():   #推理时不追踪梯度
                 for i in range(self.num_steps_per_env):
                     actions = self.alg.act(obs, critic_obs)  #采样动作，更新动作概率分布及观测的数据
                     #与环境交互获得各种数据
@@ -122,7 +122,7 @@ class HIMOnPolicyRunner:
                     #把环境交互得到的一步数据，整理成一条 transition 并存进 rollout buffer（轨迹缓存）
                     self.alg.process_env_step(rewards, dones, infos, next_critic_obs)
                 
-                    if self.log_dir is not None:
+                    if self.log_dir is not None:  #日志相关的操作
                         # Book keeping
                         if 'episode' in infos:
                             ep_infos.append(infos['episode'])

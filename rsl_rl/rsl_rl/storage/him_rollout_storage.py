@@ -42,7 +42,7 @@ class HIMRolloutStorage:
             self.rewards = None
             self.dones = None
             self.values = None
-            self.actions_log_prob = None
+            self.actions_log_prob = None 
             self.action_mean = None
             self.action_sigma = None
             self.next_critic_observations = None
@@ -109,14 +109,14 @@ class HIMRolloutStorage:
                 next_values = last_values
             else:
                 next_values = self.values[step + 1]
-            next_is_not_terminal = 1.0 - self.dones[step].float()
-            delta = self.rewards[step] + next_is_not_terminal * gamma * next_values - self.values[step]
-            advantage = delta + next_is_not_terminal * gamma * lam * advantage
-            self.returns[step] = advantage + self.values[step]
+            next_is_not_terminal = 1.0 - self.dones[step].float()  #判断是否为终止状态
+            delta = self.rewards[step] + next_is_not_terminal * gamma * next_values - self.values[step] #δ_t = r_t + γ * V(st+1) - V(st)
+            advantage = delta + next_is_not_terminal * gamma * lam * advantage   #A_t = δ_t + γ * λ * A_{t+1}，其中λ是一个衰减因子，控制着未来奖励对当前优势的影响程度
+            self.returns[step] = advantage + self.values[step]  #G_t = A_t + V(st)，其中G_t是状态st的回报，A_t是状态st的优势，V(st)是状态st的值函数估计。通过将优势与值函数估计相加，我们得到了状态st的回报，这个回报可以用来更新策略和价值函数。
 
         # Compute and normalize the advantages
-        self.advantages = self.returns - self.values
-        self.advantages = (self.advantages - self.advantages.mean()) / (self.advantages.std() + 1e-8)
+        self.advantages = self.returns - self.values  #A_t = G_t - V(st)，其中A_t是状态st的优势，G_t是状态st的回报，V(st)是状态st的值函数估计。通过将回报与值函数估计相减，我们得到了状态st的优势，这个优势可以用来更新策略。
+        self.advantages = (self.advantages - self.advantages.mean()) / (self.advantages.std() + 1e-8)  #对优势进行归一化处理，使其具有零均值和单位方差，这有助于稳定训练过程。
 
     def get_statistics(self):
         done = self.dones

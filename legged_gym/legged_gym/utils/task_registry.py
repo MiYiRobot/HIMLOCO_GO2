@@ -47,15 +47,16 @@ class TaskRegistry():
         self.env_cfgs = {}
         self.train_cfgs = {}
     
+    # task_registry.register( "go2", LeggedRobot, GO2RoughCfg(), GO2RoughCfgPPO() )
     def register(self, name: str, task_class: VecEnv, env_cfg: LeggedRobotCfg, train_cfg: LeggedRobotCfgPPO):
-        self.task_classes[name] = task_class
-        self.env_cfgs[name] = env_cfg
-        self.train_cfgs[name] = train_cfg
+        self.task_classes[name] = task_class  #LeggedRobot
+        self.env_cfgs[name] = env_cfg         #GO2RoughCfg()
+        self.train_cfgs[name] = train_cfg     #GO2RoughCfgPPO()
     
     def get_task_class(self, name: str) -> VecEnv:
         return self.task_classes[name]
     
-    def get_cfgs(self, name) -> Tuple[LeggedRobotCfg, LeggedRobotCfgPPO]:
+    def get_cfgs(self, name) -> Tuple[LeggedRobotCfg, LeggedRobotCfgPPO]: #Tuple来规定返回值的类型
         train_cfg = self.train_cfgs[name]
         env_cfg = self.env_cfgs[name]
         # copy seed
@@ -94,6 +95,7 @@ class TaskRegistry():
         # parse sim params (convert to dict first)
         sim_params = {"sim": class_to_dict(env_cfg.sim)}
         sim_params = parse_sim_params(args, sim_params)
+        # LeggedRobot(GO2RoughCfg(),GO2RoughCfg().sim,...)
         env = task_class(   cfg=env_cfg,
                             sim_params=sim_params,
                             physics_engine=args.physics_engine,
@@ -128,12 +130,12 @@ class TaskRegistry():
             if name is None:
                 raise ValueError("Either 'name' or 'train_cfg' must be not None")
             # load config files
-            _, train_cfg = self.get_cfgs(name)
+            _, train_cfg = self.get_cfgs(name)   # LeggedRobotCfgPPO
         else:
             if name is not None:
                 print(f"'train_cfg' provided -> Ignoring 'name={name}'")
         # override cfg from args (if specified)
-        _, train_cfg = update_cfg_from_args(None, train_cfg, args)
+        _, train_cfg = update_cfg_from_args(None, train_cfg, args) #从输入的参数之中更新参数
 
         if log_root=="default":
             log_root = os.path.join(LEGGED_GYM_ROOT_DIR, 'logs', train_cfg.runner.experiment_name)
@@ -143,7 +145,7 @@ class TaskRegistry():
         else:
             log_dir = os.path.join(log_root, datetime.now().strftime('%b%d_%H-%M-%S') + '_' + train_cfg.runner.run_name)
         
-        train_cfg_dict = class_to_dict(train_cfg)
+        train_cfg_dict = class_to_dict(train_cfg)  #LeggedRobotCfgPPO
         runner = HIMOnPolicyRunner(env, train_cfg_dict, log_dir, device=args.rl_device)
         #save resume path before creating a new log_dir
         resume = train_cfg.runner.resume

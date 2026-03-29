@@ -36,7 +36,7 @@ from rsl_rl.modules import HIMActorCritic
 from rsl_rl.storage import HIMRolloutStorage
 
 class HIMPPO:
-    actor_critic: HIMActorCritic
+    actor_critic: HIMActorCritic   #指出actor_critic的类型，方便IDE提示和代码检查
     def __init__(self,
                  actor_critic,
                  num_learning_epochs=1,
@@ -56,8 +56,8 @@ class HIMPPO:
 
         self.device = device
 
-        self.desired_kl = desired_kl
-        self.schedule = schedule
+        self.desired_kl = desired_kl  # 期望的KL散度
+        self.schedule = schedule   #adaptive 是否自动调整学习率
         self.learning_rate = learning_rate
 
         # PPO components
@@ -68,15 +68,15 @@ class HIMPPO:
         self.transition = HIMRolloutStorage.Transition()
 
         # PPO parameters
-        self.clip_param = clip_param
-        self.num_learning_epochs = num_learning_epochs
-        self.num_mini_batches = num_mini_batches
-        self.value_loss_coef = value_loss_coef
-        self.entropy_coef = entropy_coef
-        self.gamma = gamma
-        self.lam = lam
-        self.max_grad_norm = max_grad_norm
-        self.use_clipped_value_loss = use_clipped_value_loss
+        self.clip_param = clip_param   #PPO 的剪切系数 ε
+        self.num_learning_epochs = num_learning_epochs  #每次更新时对一批数据做多少次迭代5
+        self.num_mini_batches = num_mini_batches  #每次更新时将数据分成多少个小批量4
+        self.value_loss_coef = value_loss_coef  #value loss 在总损失中的权重
+        self.entropy_coef = entropy_coef  #熵损失在总损失中的权重
+        self.gamma = gamma  #折扣因子γ
+        self.lam = lam  #GAE的lambda参数λ
+        self.max_grad_norm = max_grad_norm  #梯度裁剪的最大范数
+        self.use_clipped_value_loss = use_clipped_value_loss  #是否使用剪切的价值损失
 
     def init_storage(self, num_envs, num_transitions_per_env, actor_obs_shape, critic_obs_shape, action_shape):
         self.storage = HIMRolloutStorage(num_envs, num_transitions_per_env, actor_obs_shape, critic_obs_shape, action_shape, self.device)
@@ -173,10 +173,10 @@ class HIMPPO:
                 loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean()
 
                 # Gradient step
-                self.optimizer.zero_grad()
-                loss.backward()
-                nn.utils.clip_grad_norm_(self.actor_critic.parameters(), self.max_grad_norm)
-                self.optimizer.step()
+                self.optimizer.zero_grad()  #梯度清零
+                loss.backward()   #反向传播
+                nn.utils.clip_grad_norm_(self.actor_critic.parameters(), self.max_grad_norm) #梯度裁剪
+                self.optimizer.step()  #更新参数
 
                 mean_value_loss += value_loss.item()
                 mean_surrogate_loss += surrogate_loss.item()

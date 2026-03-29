@@ -24,16 +24,16 @@ class HIMEstimator(nn.Module):
             print("Estimator_CL.__init__ got unexpected arguments, which will be ignored: " + str(
                 [key for key in kwargs.keys()]))
         super(HIMEstimator, self).__init__()
-        activation = get_activation(activation)
+        activation = get_activation(activation) #获取激活函数实例
 
-        self.temporal_steps = temporal_steps
-        self.num_one_step_obs = num_one_step_obs
-        self.num_latent = enc_hidden_dims[-1]
-        self.max_grad_norm = max_grad_norm
-        self.temperature = temperature
+        self.temporal_steps = temporal_steps  #历史长度6
+        self.num_one_step_obs = num_one_step_obs #每步步长45
+        self.num_latent = enc_hidden_dims[-1]  #环境特性维度16
+        self.max_grad_norm = max_grad_norm #梯度裁剪阈值，控制estimator更新时梯度的最大范围，预防梯度爆炸导致不稳点
+        self.temperature = temperature  #softmax 温度系数（T越小越极端，越大越平滑）
 
         # Encoder
-        enc_input_dim = self.temporal_steps * self.num_one_step_obs
+        enc_input_dim = self.temporal_steps * self.num_one_step_obs #学生网络维度  6*45             
         enc_layers = []
         for l in range(len(enc_hidden_dims) - 1):
             enc_layers += [nn.Linear(enc_input_dim, enc_hidden_dims[l]), activation]
@@ -42,7 +42,7 @@ class HIMEstimator(nn.Module):
         self.encoder = nn.Sequential(*enc_layers)
 
         # Target
-        tar_input_dim = self.num_one_step_obs
+        tar_input_dim = self.num_one_step_obs  #教师网络维度45
         tar_layers = []
         for l in range(len(tar_hidden_dims)):
             tar_layers += [nn.Linear(tar_input_dim, tar_hidden_dims[l]), activation]
@@ -87,7 +87,7 @@ class HIMEstimator(nn.Module):
         z_s = self.encoder(obs_history)
         #教师网络的前向传播 输入：特性观测 输出：事实得出的环境特性
         z_t = self.target(next_obs)
-        pred_vel, z_s = z_s[..., :3], z_s[..., 3:]  #拆分学生特性
+        pred_vel, z_s = z_s[..., :3], z_s[..., 3:]  #拆分学生特性 拆分成预测的线速度和环境特性
 
         #特征归一化
         z_s = F.normalize(z_s, dim=-1, p=2)
@@ -100,7 +100,7 @@ class HIMEstimator(nn.Module):
             self.proto.weight.copy_(w)
 
         #相似度计算
-        score_s = z_s @ self.proto.weight.T
+        score_s = z_s @ self.proto.weight.T   # @为矩阵叉乘
         score_t = z_t @ self.proto.weight.T
 
         #将相似度转为一个平衡的软分配矩阵
@@ -113,9 +113,9 @@ class HIMEstimator(nn.Module):
         log_p_t = F.log_softmax(score_t / self.temperature, dim=-1)
 
         #交叉预测损失
-        swap_loss = -0.5 * (q_s * log_p_t + q_t * log_p_s).mean()
+        swap_loss = -0.5 * (q_s * log_p_t + q_t * log_p_s).mean()  #关于隐变量即环境特征的损失
         #监督损失：速度预测误差
-        estimation_loss = F.mse_loss(pred_vel, vel)
+        estimation_loss = F.mse_loss(pred_vel, vel)  #均方差损失
         losses = estimation_loss + swap_loss  #总损失
 
         self.optimizer.zero_grad()  #梯度清零
@@ -128,18 +128,18 @@ class HIMEstimator(nn.Module):
 
 @torch.no_grad()
 def sinkhorn(out, eps=0.05, iters=3):
-    Q = torch.exp(out / eps).T
+    Q = torch.exp(out / eps).T  #对相似度矩阵进行缩放并取指数，得到一个非负矩阵Q，T为转置，使得行表示样本，列表示原型,out/eps为温度缩放
     K, B = Q.shape[0], Q.shape[1]
-    Q /= Q.sum()
+    Q /= Q.sum()  #归一化，
 
     for it in range(iters):
         # normalize each row: total weight per prototype must be 1/K
-        Q /= torch.sum(Q, dim=1, keepdim=True)
-        Q /= K
+        Q /= torch.sum(Q, dim=1, keepdim=True)  #行归一化
+        Q /= K #使每行的和变成1/K
 
         # normalize each column: total weight per sample must be 1/B
-        Q /= torch.sum(Q, dim=0, keepdim=True)
-        Q /= B
+        Q /= torch.sum(Q, dim=0, keepdim=True)  #列归一化
+        Q /= B  #使每列的和变成1/B
     return (Q * B).T
 
 

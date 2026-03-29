@@ -261,24 +261,25 @@ class LeggedRobot(BaseTask):
     def compute_observations(self):
         """ Computes observations
         """
-        current_obs = torch.cat((   self.commands[:, :3] * self.commands_scale,
-                                    self.base_ang_vel  * self.obs_scales.ang_vel,
-                                    self.projected_gravity,
-                                    (self.dof_pos - self.default_dof_pos) * self.obs_scales.dof_pos,
-                                    self.dof_vel * self.obs_scales.dof_vel,
-                                    self.actions
+        current_obs = torch.cat((   self.commands[:, :3] * self.commands_scale,  #期望指令
+                                    self.base_ang_vel  * self.obs_scales.ang_vel, #基座角速度
+                                    self.projected_gravity,   #重力在机器人坐标系中的投影
+                                    (self.dof_pos - self.default_dof_pos) * self.obs_scales.dof_pos, #关节偏移量
+                                    self.dof_vel * self.obs_scales.dof_vel, #关节速度
+                                    self.actions  #当前动作
                                     ),dim=-1)
         # add noise if needed
         if self.add_noise:
             current_obs += (2 * torch.rand_like(current_obs) - 1) * self.noise_scale_vec[0:(9 + 3 * self.num_actions)]
 
-        # add perceptive inputs if not blind
+        # add perceptive inputs if not blind  添加预测的基座线速度和扰动
         current_obs = torch.cat((current_obs, self.base_lin_vel * self.obs_scales.lin_vel, self.disturbance[:, 0, :]), dim=-1)
-        if self.cfg.terrain.measure_heights:
+        if self.cfg.terrain.measure_heights:  #加上地形观测信息（机器狗高度-传感器探测地形高度-0.5）
             heights = torch.clip(self.root_states[:, 2].unsqueeze(1) - 0.5 - self.measured_heights, -1, 1.) * self.obs_scales.height_measurements 
             heights += (2 * torch.rand_like(heights) - 1) * self.noise_scale_vec[(9 + 3 * self.num_actions):(9 + 3 * self.num_actions+187)]
-            current_obs = torch.cat((current_obs, heights), dim=-1)
+            current_obs = torch.cat((current_obs, heights), dim=-1) 
         #去除最老的一段观测，加入最新观测（FIFO）    num_one_step_obs会将数据进行切片，导致只接收到45个观测维度，:-self.num_one_step_obs表示从头取到倒数第num_one_step_obs个位置
+        #取前num_one_step_obs个维度的当前观测，和之前的观测拼接起来，并去掉最老的一段观测，形成新的观测buffer，前面新后面旧
         self.obs_buf = torch.cat((current_obs[:, :self.num_one_step_obs], self.obs_buf[:, :-self.num_one_step_obs]), dim=-1)
         self.privileged_obs_buf = torch.cat((current_obs[:, :self.num_one_step_privileged_obs], self.privileged_obs_buf[:, :-self.num_one_step_privileged_obs]), dim=-1)
 

@@ -28,8 +28,6 @@
 - Deploy
    - cd legged_gym/deploy/deploy_real
    - python deploy_real_go2.py <网卡名称> go2.ymal
-5. Use pretrain policy
-- Train
-  python train.py --resume --task=go2 --load_run=Jan21_12-32-41_good --checkpoint=2400 
-- Play
-  python play.py --resume --task=go2 --load_run=Jan21_12-32-41_good --checkpoint=2400
+5.	Demo演示
+
+- 观看项目演示视频：[点击这里](https://www.bilibili.com/video/BV1CSXNYbEn4/?spm_id_from=333.1387.upload.video_card.click&vd_source=032f2f8aec6b50da9d8cb77f6a494111)
